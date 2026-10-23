@@ -1,3 +1,4 @@
+
 package com.fulfilment.application.monolith.stores;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -5,6 +6,9 @@ import com.fasterxml.jackson.databind.node.ObjectNode;
 import io.quarkus.panache.common.Sort;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
+import jakarta.transaction.Status;
+import jakarta.transaction.Synchronization;
+import jakarta.transaction.TransactionSynchronizationRegistry;
 import jakarta.transaction.Transactional;
 import jakarta.ws.rs.Consumes;
 import jakarta.ws.rs.DELETE;
@@ -18,7 +22,9 @@ import jakarta.ws.rs.WebApplicationException;
 import jakarta.ws.rs.core.Response;
 import jakarta.ws.rs.ext.ExceptionMapper;
 import jakarta.ws.rs.ext.Provider;
+
 import java.util.List;
+
 import org.jboss.logging.Logger;
 
 @Path("store")
@@ -27,123 +33,212 @@ import org.jboss.logging.Logger;
 @Consumes("application/json")
 public class StoreResource {
 
-  @Inject LegacyStoreManagerGateway legacyStoreManagerGateway;
+    private static final Logger LOGGER =
+            Logger.getLogger(StoreResource.class.getName());
 
-  private static final Logger LOGGER = Logger.getLogger(StoreResource.class.getName());
+    @Inject
+    LegacyStoreManagerGateway legacyStoreManagerGateway;
 
-  @GET
-  public List<Store> get() {
-    return Store.listAll(Sort.by("name"));
-  }
+    @Inject
+    TransactionSynchronizationRegistry transactionRegistry;
 
-  @GET
-  @Path("{id}")
-  public Store getSingle(Long id) {
-    Store entity = Store.findById(id);
-    if (entity == null) {
-      throw new WebApplicationException("Store with id of " + id + " does not exist.", 404);
-    }
-    return entity;
-  }
+    /**
+     * Executes the supplied action only after the current transaction
+     * has successfully committed.
+     */
+    private void runAfterCommit(Runnable action) {
+        transactionRegistry.registerInterposedSynchronization(
+                new Synchronization() {
+                    @Override
+                    public void beforeCompletion() {
+                        // No action required before transaction completion.
+                    }
 
-  @POST
-  @Transactional
-  public Response create(Store store) {
-    if (store.id != null) {
-      throw new WebApplicationException("Id was invalidly set on request.", 422);
-    }
+                    @Override
+                    public void afterCompletion(int status) {
+                        if (status != Status.STATUS_COMMITTED) {
+                            LOGGER.debug(
+                                    "Transaction did not commit. "
+                                            + "Skipping legacy system notification."
+                            );
+                            return;
+                        }
 
-    store.persist();
-
-    legacyStoreManagerGateway.createStoreOnLegacySystem(store);
-
-    return Response.ok(store).status(201).build();
-  }
-
-  @PUT
-  @Path("{id}")
-  @Transactional
-  public Store update(Long id, Store updatedStore) {
-    if (updatedStore.name == null) {
-      throw new WebApplicationException("Store Name was not set on request.", 422);
-    }
-
-    Store entity = Store.findById(id);
-
-    if (entity == null) {
-      throw new WebApplicationException("Store with id of " + id + " does not exist.", 404);
+                        try {
+                            action.run();
+                        } catch (Exception exception) {
+                            LOGGER.error(
+                                    "Database transaction committed, "
+                                            + "but legacy system notification failed.",
+                                    exception
+                            );
+                        }
+                    }
+                }
+        );
     }
 
-    entity.name = updatedStore.name;
-    entity.quantityProductsInStock = updatedStore.quantityProductsInStock;
-
-    legacyStoreManagerGateway.updateStoreOnLegacySystem(updatedStore);
-
-    return entity;
-  }
-
-  @PATCH
-  @Path("{id}")
-  @Transactional
-  public Store patch(Long id, Store updatedStore) {
-    if (updatedStore.name == null) {
-      throw new WebApplicationException("Store Name was not set on request.", 422);
+    @GET
+    public List<Store> get() {
+        return Store.listAll(Sort.by("name"));
     }
 
-    Store entity = Store.findById(id);
+    @GET
+    @Path("{id}")
+    public Store getSingle(Long id) {
+        Store entity = Store.findById(id);
 
-    if (entity == null) {
-      throw new WebApplicationException("Store with id of " + id + " does not exist.", 404);
+        if (entity == null) {
+            throw new WebApplicationException(
+                    "Store with id of " + id + " does not exist.",
+                    404
+            );
+        }
+
+        return entity;
     }
 
-    if (entity.name != null) {
-      entity.name = updatedStore.name;
+    @POST
+    @Transactional
+    public Response create(Store store) {
+        if (store.id != null) {
+            throw new WebApplicationException(
+                    "Id was invalidly set on request.",
+                    422
+            );
+        }
+
+        store.persist();
+
+        runAfterCommit(
+                () -> legacyStoreManagerGateway
+                        .createStoreOnLegacySystem(store)
+        );
+
+        return Response.ok(store).status(201).build();
     }
 
-    if (entity.quantityProductsInStock != 0) {
-      entity.quantityProductsInStock = updatedStore.quantityProductsInStock;
+    @PUT
+    @Path("{id}")
+    @Transactional
+    public Store update(Long id, Store updatedStore) {
+        if (updatedStore.name == null) {
+            throw new WebApplicationException(
+                    "Store Name was not set on request.",
+                    422
+            );
+        }
+
+        Store entity = Store.findById(id);
+
+        if (entity == null) {
+            throw new WebApplicationException(
+                    "Store with id of " + id + " does not exist.",
+                    404
+            );
+        }
+
+        entity.name = updatedStore.name;
+        entity.quantityProductsInStock =
+                updatedStore.quantityProductsInStock;
+
+        // Pass the managed, updated entity to the legacy gateway after commit.
+        runAfterCommit(
+                () -> legacyStoreManagerGateway
+                        .updateStoreOnLegacySystem(entity)
+        );
+
+        return entity;
     }
 
-    legacyStoreManagerGateway.updateStoreOnLegacySystem(updatedStore);
+    @PATCH
+    @Path("{id}")
+    @Transactional
+    public Store patch(Long id, Store updatedStore) {
+        if (updatedStore.name == null) {
+            throw new WebApplicationException(
+                    "Store Name was not set on request.",
+                    422
+            );
+        }
 
-    return entity;
-  }
+        Store entity = Store.findById(id);
 
-  @DELETE
-  @Path("{id}")
-  @Transactional
-  public Response delete(Long id) {
-    Store entity = Store.findById(id);
-    if (entity == null) {
-      throw new WebApplicationException("Store with id of " + id + " does not exist.", 404);
+        if (entity == null) {
+            throw new WebApplicationException(
+                    "Store with id of " + id + " does not exist.",
+                    404
+            );
+        }
+
+        if (entity.name != null) {
+            entity.name = updatedStore.name;
+        }
+
+        if (entity.quantityProductsInStock != 0) {
+            entity.quantityProductsInStock =
+                    updatedStore.quantityProductsInStock;
+        }
+
+        // Pass the managed, updated entity to the legacy gateway after commit.
+        runAfterCommit(
+                () -> legacyStoreManagerGateway
+                        .updateStoreOnLegacySystem(entity)
+        );
+
+        return entity;
     }
-    entity.delete();
-    return Response.status(204).build();
-  }
 
-  @Provider
-  public static class ErrorMapper implements ExceptionMapper<Exception> {
+    @DELETE
+    @Path("{id}")
+    @Transactional
+    public Response delete(Long id) {
+        Store entity = Store.findById(id);
 
-    @Inject ObjectMapper objectMapper;
+        if (entity == null) {
+            throw new WebApplicationException(
+                    "Store with id of " + id + " does not exist.",
+                    404
+            );
+        }
 
-    @Override
-    public Response toResponse(Exception exception) {
-      LOGGER.error("Failed to handle request", exception);
+        entity.delete();
 
-      int code = 500;
-      if (exception instanceof WebApplicationException) {
-        code = ((WebApplicationException) exception).getResponse().getStatus();
-      }
-
-      ObjectNode exceptionJson = objectMapper.createObjectNode();
-      exceptionJson.put("exceptionType", exception.getClass().getName());
-      exceptionJson.put("code", code);
-
-      if (exception.getMessage() != null) {
-        exceptionJson.put("error", exception.getMessage());
-      }
-
-      return Response.status(code).entity(exceptionJson).build();
+        return Response.status(204).build();
     }
-  }
+
+    @Provider
+    public static class ErrorMapper implements ExceptionMapper<Exception> {
+
+        @Inject
+        ObjectMapper objectMapper;
+
+        @Override
+        public Response toResponse(Exception exception) {
+            LOGGER.error("Failed to handle request", exception);
+
+            int code = 500;
+
+            if (exception instanceof WebApplicationException) {
+                code = ((WebApplicationException) exception)
+                        .getResponse()
+                        .getStatus();
+            }
+
+            ObjectNode exceptionJson = objectMapper.createObjectNode();
+            exceptionJson.put(
+                    "exceptionType",
+                    exception.getClass().getName()
+            );
+            exceptionJson.put("code", code);
+
+            if (exception.getMessage() != null) {
+                exceptionJson.put("error", exception.getMessage());
+            }
+
+            return Response.status(code)
+                    .entity(exceptionJson)
+                    .build();
+        }
+    }
 }

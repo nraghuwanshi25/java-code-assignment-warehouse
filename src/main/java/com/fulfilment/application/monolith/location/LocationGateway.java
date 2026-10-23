@@ -4,7 +4,10 @@ import com.fulfilment.application.monolith.warehouses.domain.models.Location;
 import com.fulfilment.application.monolith.warehouses.domain.ports.LocationResolver;
 import java.util.ArrayList;
 import java.util.List;
+import java.util.Optional;
+import jakarta.enterprise.context.ApplicationScoped;
 
+@ApplicationScoped
 public class LocationGateway implements LocationResolver {
 
   private static final List<Location> locations = new ArrayList<>();
@@ -22,7 +25,10 @@ public class LocationGateway implements LocationResolver {
 
   @Override
   public Location resolveByIdentifier(String identifier) {
-    // TODO implement this method
-    throw new UnsupportedOperationException("Unimplemented method 'resolveByIdentifier'");
+    // return the first match by identification or null if not found
+    Optional<Location> found = locations.stream()
+            .filter(l -> l.identification != null && l.identification.equals(identifier))
+            .findFirst();
+    return found.orElse(null);
   }
 }
