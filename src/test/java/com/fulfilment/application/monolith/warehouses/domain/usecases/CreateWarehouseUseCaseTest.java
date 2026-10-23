@@ -196,28 +196,6 @@ public class CreateWarehouseUseCaseTest {
             return locs.stream().filter(l -> l.identification.equals(identifier)).findFirst().orElse(null);
         }
     }
-//    @Test
-//    public void testGettersAndSettersAndDefaults() {
-//        com.warehouse.api.beans.Warehouse w = new com.warehouse.api.beans.Warehouse();
-//        // defaults should be null
-//        assertNull(w.getId());
-//        assertNull(w.getBusinessUnitCode());
-//        assertNull(w.getLocation());
-//        assertNull(w.getCapacity());
-//        assertNull(w.getStock());
-//
-//        w.setId("id-1");
-//        w.setBusinessUnitCode("BUC-1");
-//        w.setLocation("LOC-1");
-//        w.setCapacity(42);
-//        w.setStock(7);
-//
-//        assertEquals("id-1", w.getId());
-//        assertEquals("BUC-1", w.getBusinessUnitCode());
-//        assertEquals("LOC-1", w.getLocation());
-//        assertEquals(Integer.valueOf(42), w.getCapacity());
-//        assertEquals(Integer.valueOf(7), w.getStock());
-//    }
 
     @Test
     public void testDomainWarehouseGettersAndSetters() {
