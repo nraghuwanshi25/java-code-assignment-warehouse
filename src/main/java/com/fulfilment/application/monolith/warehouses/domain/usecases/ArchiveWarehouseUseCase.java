@@ -1,11 +1,12 @@
 package com.fulfilment.application.monolith.warehouses.domain.usecases;
 
+import com.fulfilment.application.monolith.warehouses.adapters.database.WarehouseRepository;
 import com.fulfilment.application.monolith.warehouses.domain.models.Warehouse;
 import com.fulfilment.application.monolith.warehouses.domain.ports.ArchiveWarehouseOperation;
 import com.fulfilment.application.monolith.warehouses.domain.ports.WarehouseStore;
 import jakarta.enterprise.context.ApplicationScoped;
 import jakarta.inject.Inject;
-import jakarta.ws.rs.WebApplicationException;
+import jakarta.transaction.Transactional;
 import java.time.LocalDateTime;
 
 @ApplicationScoped
@@ -13,23 +14,18 @@ public class ArchiveWarehouseUseCase implements ArchiveWarehouseOperation {
 
   private final WarehouseStore warehouseStore;
 
+  // direct repository access to perform DB-level archive updates when available
+  @Inject
+  private WarehouseRepository warehouseRepository;
+
   @Inject
   public ArchiveWarehouseUseCase(WarehouseStore warehouseStore) {
     this.warehouseStore = warehouseStore;
   }
 
-  @Override
+  @Transactional
   public void archive(Warehouse warehouse) {
-    if (warehouse == null || warehouse.getBusinessUnitCode() == null) {
-      throw new WebApplicationException("invalid warehouse", 400);
-    }
-
-    var existing = warehouseStore.findByBusinessUnitCode(warehouse.getBusinessUnitCode());
-    if (existing == null) {
-      throw new WebApplicationException("warehouse not found", 404);
-    }
-
-    existing.setArchivedAt(LocalDateTime.now());
-    warehouseStore.update(existing);
+    warehouse.setArchivedAt(LocalDateTime.now());
+    warehouseStore.update(warehouse);
   }
 }

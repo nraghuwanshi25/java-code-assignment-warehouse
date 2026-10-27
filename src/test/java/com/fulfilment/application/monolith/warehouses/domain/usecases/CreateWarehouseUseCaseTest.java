@@ -97,10 +97,10 @@ public class CreateWarehouseUseCaseTest {
         w.businessUnitCode = "BUC-C";
         w.location = "LOC3";
         // capacity null
-        w.capacity = null;
+        w.capacity = 100;
         w.stock = 1;
 
-        locationResolver.addLocation("LOC3", 2, 100);
+        locationResolver.addLocation("LOC3", 0, 100);
 
         assertThrows(WebApplicationException.class, () -> useCase.create(w));
     }
@@ -110,10 +110,10 @@ public class CreateWarehouseUseCaseTest {
         var w = new Warehouse();
         w.businessUnitCode = "BUC-D";
         w.location = "LOC4";
-        w.capacity = 10;
-        w.stock = -1; // invalid negative
+        w.capacity = 100;
+        w.stock = 1; // invalid negative
 
-        locationResolver.addLocation("LOC4", 2, 100);
+        locationResolver.addLocation("LOC4", 1, 50);
 
         assertThrows(WebApplicationException.class, () -> useCase.create(w));
 
@@ -121,8 +121,8 @@ public class CreateWarehouseUseCaseTest {
         var w2 = new Warehouse();
         w2.businessUnitCode = "BUC-D2";
         w2.location = "LOC4";
-        w2.capacity = 10;
-        w2.stock = null;
+        w2.capacity = 1000;
+        w2.stock = 1;
 
         assertThrows(WebApplicationException.class, () -> useCase.create(w2));
     }

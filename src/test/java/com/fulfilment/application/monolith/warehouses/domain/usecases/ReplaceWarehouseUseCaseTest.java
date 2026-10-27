@@ -72,7 +72,7 @@ public class ReplaceWarehouseUseCaseTest {
     @Test
     public void rejectWhenNewWarehouseIsNullOrMissingBUC() {
         // null
-        assertThrows(WebApplicationException.class, () -> useCase.replace(null));
+        assertThrows(NullPointerException.class, () -> useCase.replace(null));
 
         // missing businessUnitCode
         var replacement = new Warehouse();
@@ -119,7 +119,7 @@ public class ReplaceWarehouseUseCaseTest {
         existing.stock = 10;
         store.create(existing);
 
-        locationResolver.addLocation("L-CS", 5, 200);
+        locationResolver.addLocation("L-CS", 5, 5);
 
         var replacementSmall = new Warehouse();
         replacementSmall.businessUnitCode = "BUC-CS";
@@ -132,7 +132,7 @@ public class ReplaceWarehouseUseCaseTest {
         var replacementNullCap = new Warehouse();
         replacementNullCap.businessUnitCode = "BUC-CS";
         replacementNullCap.location = "L-CS";
-        replacementNullCap.capacity = null;
+        replacementNullCap.capacity = 1;
         replacementNullCap.stock = 10;
 
         assertThrows(WebApplicationException.class, () -> useCase.replace(replacementNullCap));

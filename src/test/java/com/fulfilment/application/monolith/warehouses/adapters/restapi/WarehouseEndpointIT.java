@@ -9,55 +9,53 @@ import org.junit.jupiter.api.Test;
 @QuarkusIntegrationTest
 public class WarehouseEndpointIT {
 
-  @Test
-  public void testSimpleListWarehouses() {
+    @Test
+    public void testSimpleListWarehouses() {
 
-    final String path = "warehouse";
+        final String path = "warehouse";
 
-    // List all, should have all 3 products the database has initially:
-    given()
-            .when()
-            .get(path)
-            .then()
-            .statusCode(200)
-            .body(containsString("MWH.001"), containsString("MWH.012"), containsString("MWH.023"));
-  }
-
-  @Test
-  public void testSimpleCheckingArchivingWarehouses() {
-
-    // Uncomment the following lines to test the WarehouseResourceImpl implementation
-
-     final String path = "warehouse";
-
-//     List all, should have all 3 products the database has initially:
-     given()
-         .when()
-         .get(path)
-         .then()
-         .statusCode(200)
-         .body(
-             containsString("MWH.001"),
-             containsString("MWH.012"),
-             containsString("MWH.023"),
-             containsString("ZWOLLE-001"),
-             containsString("AMSTERDAM-001"),
-             containsString("TILBURG-001"));
-
-     // Archive the ZWOLLE-001:
-     // use businessUnitCode in path (resource expects BU code, not numeric id)
-     given().when().delete(path + "/MWH.001").then().statusCode(204);
-
-     // List all, ZWOLLE-001 should be missing now:
-      given()
-              .when()
-              .get(path)
-              .then()
-              .statusCode(200)
-              .body(
-                      not(containsString("MWH.021")),
-                      containsString("MWH.012"),
-                      containsString("MWH.023"));
+        // List all, should have all 3 products the database has initially:
+        given()
+                .when()
+                .get(path)
+                .then()
+                .statusCode(200)
+                .body(containsString("MWH.001"), containsString("MWH.012"), containsString("MWH.023"));
     }
-  }
 
+    @Test
+    public void testSimpleCheckingArchivingWarehouses() {
+
+        // Uncomment the following lines to test the WarehouseResourceImpl implementation
+
+         final String path = "warehouse";
+
+        // List all, should have all 3 products the database has initially:
+         given()
+             .when()
+             .get(path)
+             .then()
+             .statusCode(200)
+             .body(
+                 containsString("MWH.001"),
+                 containsString("MWH.012"),
+                 containsString("MWH.023"),
+                 containsString("ZWOLLE-001"),
+                 containsString("AMSTERDAM-001"),
+                 containsString("TILBURG-001"));
+
+         // Archive the ZWOLLE-001:
+         given().when().delete(path + "/1").then().statusCode(204);
+
+         // List all, ZWOLLE-001 should be missing now:
+         given()
+             .when()
+             .get(path)
+             .then()
+             .statusCode(200)
+             .body(
+                 not(containsString("ZWOLLE-001")),
+                 containsString("AMSTERDAM-001"),
+                 containsString("TILBURG-001"));
+    }
+}

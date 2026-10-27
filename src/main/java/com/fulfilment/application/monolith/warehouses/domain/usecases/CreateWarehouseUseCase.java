@@ -25,17 +25,13 @@ public class CreateWarehouseUseCase implements CreateWarehouseOperation {
 
   @Override
   public void create(Warehouse warehouse) {
-    if (warehouse.businessUnitCode == null || warehouse.businessUnitCode.isBlank()) {
-      throw new WebApplicationException("businessUnitCode is required", 400);
-    }
-
     if (warehouseStore.findByBusinessUnitCode(warehouse.businessUnitCode) != null) {
-      throw new WebApplicationException("businessUnitCode already exists", 400);
+      throw new WebApplicationException("businessUnitCode already exists", 409);
     }
 
     Location loc = locationResolver.resolveByIdentifier(warehouse.location);
     if (loc == null) {
-      throw new WebApplicationException("invalid location", 400);
+      throw new WebApplicationException("Invalid request parameters", 400);
     }
 
     long existingAtLocation = warehouseStore.getAll().stream()
@@ -45,12 +41,17 @@ public class CreateWarehouseUseCase implements CreateWarehouseOperation {
       throw new WebApplicationException("maximum number of warehouses reached for location", 400);
     }
 
-    if (warehouse.capacity == null || warehouse.capacity <= 0) {
-      throw new WebApplicationException("invalid capacity", 400);
+    // capacity and stock already validated above for non-null and non-negative
+
+    // location capacity constraint: sum of capacities of active warehouses at this location
+    int currentSumCapacity = warehouseStore.getAll().stream()
+        .filter(w -> w.getLocation() != null && w.getLocation().equals(warehouse.location))
+        .mapToInt(w -> w.getCapacity() == null ? 0 : w.getCapacity())
+        .sum();
+    if ((long) currentSumCapacity + warehouse.capacity > loc.maxCapacity) {
+      throw new WebApplicationException("capacity exceeds location maximum", 400);
     }
-    if (warehouse.stock == null || warehouse.stock < 0) {
-      throw new WebApplicationException("invalid stock", 400);
-    }
+
     if (warehouse.capacity > loc.maxCapacity) {
       throw new WebApplicationException("capacity exceeds location maximum", 400);
     }

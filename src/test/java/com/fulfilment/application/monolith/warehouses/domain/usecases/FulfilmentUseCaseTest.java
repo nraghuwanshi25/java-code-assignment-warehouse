@@ -7,7 +7,9 @@ import com.fulfilment.application.monolith.warehouses.adapters.database.DbWareho
 import com.fulfilment.application.monolith.warehouses.adapters.database.FulfilmentEntity;
 import com.fulfilment.application.monolith.warehouses.adapters.database.FulfilmentRepository;
 import com.fulfilment.application.monolith.warehouses.adapters.database.WarehouseRepository;
+import com.fulfilment.application.monolith.warehouses.domain.models.Fulfilment;
 import com.fulfilment.application.monolith.warehouses.domain.models.Warehouse;
+import com.fulfilment.application.monolith.warehouses.domain.models.Location;
 import io.quarkus.test.junit.QuarkusTest;
 import jakarta.inject.Inject;
 import jakarta.transaction.Transactional;
@@ -20,7 +22,7 @@ import static org.junit.jupiter.api.Assertions.*;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 @QuarkusTest
-public class FulfilmentUseCaseFullCoverageTest {
+public class FulfilmentUseCaseTest {
 
   @Inject
   FulfilmentUseCase fulfilmentUseCase;
@@ -232,5 +234,57 @@ public class FulfilmentUseCaseFullCoverageTest {
     // remove non-existing should be no-op
     warehouseRepository.remove(missing); // no exception
   }
-}
 
+  @Test
+  public void domainModelsGettersSetters() {
+    // Warehouse
+    Warehouse w = new Warehouse();
+    assertNull(w.getBusinessUnitCode());
+    assertNull(w.getLocation());
+    assertNull(w.getCapacity());
+    assertNull(w.getStock());
+    assertNull(w.getCreatedAt());
+    assertNull(w.getArchivedAt());
+
+    w.setBusinessUnitCode("BUC-TEST");
+    w.setLocation("LOC-TEST");
+    w.setCapacity(123);
+    w.setStock(45);
+    var now = java.time.LocalDateTime.now();
+    w.setCreatedAt(now);
+    w.setArchivedAt(now);
+
+    assertEquals("BUC-TEST", w.getBusinessUnitCode());
+    assertEquals("LOC-TEST", w.getLocation());
+    assertEquals(Integer.valueOf(123), w.getCapacity());
+    assertEquals(Integer.valueOf(45), w.getStock());
+    assertEquals(now, w.getCreatedAt());
+    assertEquals(now, w.getArchivedAt());
+
+    // Location
+    Location loc = new Location("L-1", 3, 1000);
+    assertEquals("L-1", loc.identification);
+    assertEquals(3, loc.maxNumberOfWarehouses);
+    assertEquals(1000, loc.maxCapacity);
+
+    // Fulfilment
+    Fulfilment f = new Fulfilment(11L, 22L, "BUC-TEST");
+    assertEquals(11L, f.productId.longValue());
+    assertEquals(22L, f.storeId.longValue());
+    assertEquals("BUC-TEST", f.warehouseBusinessUnitCode);
+    Product p = new Product(); p.name = "P-TEST"; p.stock = 5;
+    assertEquals("P-TEST", p.name);
+    Product p2 = new Product("test");
+    assertEquals("test", p2.name);
+    com.warehouse.api.beans.Warehouse wh = new com.warehouse.api.beans.Warehouse();
+    wh.setBusinessUnitCode("BUC-1");
+    wh.setLocation("LOC-1");
+    wh.setCapacity(10);
+    wh.setStock(5);
+    assertEquals("BUC-1", wh.getBusinessUnitCode());
+    assertEquals("LOC-1", wh.getLocation());
+    assertEquals(Integer.valueOf(10), wh.getCapacity());
+    assertEquals(Integer.valueOf(5), wh.getStock());
+
+  }
+}
